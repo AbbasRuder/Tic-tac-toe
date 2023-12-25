@@ -4,24 +4,59 @@ import { GiCrossMark } from "react-icons/gi"
 
 type cellState = null | "X" | "O"
 
+const WINNING_COMBINATION = [
+  [0, 1, 2],
+  [3, 4, 5],
+  [6, 7, 8],
+  [0, 3, 6],
+  [1, 4, 7],
+  [2, 5, 8],
+  [0, 4, 8],
+  [2, 4, 6],
+]
 const initialCellState: cellState[] = Array(9).fill(null)
+
 export default function MainGrid() {
   const [cells, setCells] = useState<cellState[]>(initialCellState)
   const [turnOfCross, setTurnOfCross] = useState(false)
 
   const handleClick = (index: number) => {
+    // -checks null so that fn runs only once for each cell
     if (cells[index] === null) {
-      setCells((crntCells) =>
-        crntCells.map((cell, i) => {
-          if (i === index) {
-            return turnOfCross ? "X" : "O"
-          }
-          return cell
-        })
-      )
+      const newCells = cells.map((cell, i) => {
+        if (i === index) {
+          return turnOfCross ? "X" : "O"
+        }
+        return cell
+      })
 
-      setTurnOfCross((crntTurn) => !crntTurn)
+      setCells(newCells)
+
+      if (checkWinner(newCells)) {
+        console.log("winner", turnOfCross ? "X" : "O")
+      } else if (checkDraw(newCells)) {
+        console.log("draw!!")
+      } else {
+        setTurnOfCross((crntTurn) => !crntTurn)
+      }
     }
+  }
+
+  const checkWinner = (newCells: cellState[]) => {
+    return WINNING_COMBINATION.some((combination) => {
+      const [a, b, c] = combination
+      return (
+        newCells[a] !== null &&
+        newCells[a] === newCells[b] &&
+        newCells[a] === newCells[c]
+      )
+    })
+  }
+
+  const checkDraw = (newCells: cellState[]) => {
+    return [...newCells].every((cell) => {
+      return cell === "X" || cell === "O"
+    })
   }
 
   const renderMark = (cell: cellState) => {
@@ -33,6 +68,7 @@ export default function MainGrid() {
       )
     }
   }
+
   return (
     <>
       <div
