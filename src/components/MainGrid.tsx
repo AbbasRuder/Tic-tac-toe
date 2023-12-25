@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { GiCircleClaws } from "react-icons/gi"
 import { GiCrossMark } from "react-icons/gi"
+import WinningMsg from "./WinningMsg"
 
 type cellState = null | "X" | "O"
 
@@ -19,6 +20,9 @@ const initialCellState: cellState[] = Array(9).fill(null)
 export default function MainGrid() {
   const [cells, setCells] = useState<cellState[]>(initialCellState)
   const [turnOfCross, setTurnOfCross] = useState(false)
+  const [showMsg, setShowMsg] = useState(false)
+  const [winningMsg, setWinningMsg] = useState('')
+
 
   const handleClick = (index: number) => {
     // -checks null so that fn runs only once for each cell
@@ -33,9 +37,11 @@ export default function MainGrid() {
       setCells(newCells)
 
       if (checkWinner(newCells)) {
-        console.log("winner", turnOfCross ? "X" : "O")
+        setShowMsg(true)
+        setWinningMsg(`${turnOfCross ? 'X' : 'O'} Wins !!`)
       } else if (checkDraw(newCells)) {
-        console.log("draw!!")
+        setShowMsg(true)
+        setWinningMsg("Match Draw !!")
       } else {
         setTurnOfCross((crntTurn) => !crntTurn)
       }
@@ -57,6 +63,13 @@ export default function MainGrid() {
     return [...newCells].every((cell) => {
       return cell === "X" || cell === "O"
     })
+  }
+
+  const handleGameRestart = () => {
+    setCells(initialCellState)
+    setTurnOfCross(false)
+    setWinningMsg('')
+    setShowMsg(false)
   }
 
   const renderMark = (cell: cellState) => {
@@ -87,6 +100,12 @@ export default function MainGrid() {
           )
         })}
       </div>
+
+      {showMsg && (
+        <div className="h-full fixed inset-x-0 inset-y-0 bg-slate-600/50">
+          <WinningMsg winningMsg={winningMsg} handleGameRestart={handleGameRestart}/>
+        </div>
+      )}
     </>
   )
 }
