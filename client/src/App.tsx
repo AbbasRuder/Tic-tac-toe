@@ -1,46 +1,63 @@
 import { useEffect, useRef, useState } from "react";
-import "./App.css";
 import MainGrid from "./components/MainGrid";
 
+type CellState = null | "X" | "O"
+
+const initialCellState: CellState[] = Array(9).fill(null)
 function App() {
   const [showCreateGame, setShowCreateGame] = useState(true);
   const [showInput, setShowInput] = useState(false);
   const [inputValue, setInputValue] = useState("");
 
-  // let clientId: string;
-  let gameId: string | null = null;
+  const [cells, setCells] = useState<CellState[]>(initialCellState)
+  const [turnOfCross, setTurnOfCross] = useState(false);
+  const [isTurnOkay, setIsTurnOkay] = useState(true);
+  const [result, setResult] = useState(null);
 
+  const gameIdRef = useRef<string | null>(null);
   const clientIdRef = useRef<string | null>(null);
-  const wsRef = useRef<WebSocket | null>(null);
+  const wSocketRef = useRef<WebSocket | null>(null);
 
   useEffect(() => {
-    wsRef.current = new WebSocket("ws://localhost:9090");
+    if(!wSocketRef.current)
+      wSocketRef.current = new WebSocket("ws://localhost:9090");
 
-    wsRef.current.onmessage = (message) => {
+    wSocketRef.current.onmessage = (message) => {
       // -since we are receiving stringified data from server
       const response = JSON.parse(message.data);
 
       //first response from the server
       if (response.method === "connect") {
-        clientIdRef.current = response.clientId;
-        console.log("client id set successfully - " + clientIdRef.current);
+        if (clientIdRef.current === null) {
+          clientIdRef.current = response.clientId;
+          console.log("client id set successfully - " + clientIdRef.current);
+        }
       }
 
       //receiving response after creating a game
       if (response.method === "create") {
         const { game } = response;
-        gameId = game.gameId;
+        gameIdRef.current = game.gameId;
         console.log("game created with game state - ", game);
       }
 
       //receiving response after joining a game
       if (response.method === "join") {
         const { game } = response;
-        console.log('joined game with game obj - ', game)
+        console.log("joined game with game obj - ", game);
+      }
+
+      // receiving response after playing
+      if(response.method === "play") {
+        const {turnIsOkay, cellsState, result} = response
+
+        setIsTurnOkay(turnIsOkay)
+        setCells(cellsState)
+        setResult(result)
       }
     };
 
-    wsRef.current.onerror = (error) => {
+    wSocketRef.current.onerror = (error) => {
       console.error("WebSocket error:", error);
     };
   }, []);
@@ -50,7 +67,9 @@ function App() {
       method: "create",
       clientId: clientIdRef.current,
     };
-    wsRef.current?.send(JSON.stringify(payload));
+    wSocketRef.current?.send(JSON.stringify(payload));
+
+    setTurnOfCross(true)
     setShowCreateGame(false);
   };
 
@@ -60,33 +79,48 @@ function App() {
       return;
     }
 
-    if (!gameId) {
-      gameId = inputValue;
+    if (!gameIdRef.current) {
+      gameIdRef.current = inputValue;
     }
     console.log("client", clientIdRef.current);
     const payload = {
       method: "join",
       clientId: clientIdRef.current,
-      gameId: gameId,
+      gameId: gameIdRef.current,
     };
 
-    // console.log('readystate? ',wsRef.current?.readyState);
-    // if (wsRef.current?.readyState === WebSocket.OPEN) {
-    //   wsRef.current?.send(JSON.stringify(payload));
-    // } else {
-    //   console.error("WebSocket is not open");
-    // }
+    wSocketRef.current?.send(JSON.stringify(payload));
 
-    wsRef.current?.send(JSON.stringify(payload));
+    setTurnOfCross(false)
     setShowCreateGame(false);
     setShowInput(false);
   };
 
+  const sendCellStatePayload = (index: number) => {
+    const payload = {
+      method: "play",
+      gameId: gameIdRef.current,
+      clientId: clientIdRef.current,
+      index: index
+    }
+
+    wSocketRef.current?.send(JSON.stringify(payload))
+
+  }
+
   return (
     <div className="w-screen h-screen">
-      {/* <p className='text-center text-xl font-bold'>Tic tac toe</p> */}
-      <MainGrid />
 
+      <MainGrid
+        isTurnOkay={isTurnOkay}
+        cells={cells} 
+        setCells={setCells} 
+        turnOfCross={turnOfCross}
+        sendCellStatePayload={sendCellStatePayload}
+        result={result}
+      />
+
+      {/* --------- create and join pages */}
       {showCreateGame && (
         <div className="fixed inset-x-0 inset-y-0 bg-slate-300/80 flex flex-col gap-2 justify-center items-center">
           <button
@@ -128,3 +162,11 @@ function App() {
 }
 
 export default App;
+
+// ----utility code to check for socket errors----
+// console.log('readystate? ',wSocketRef.current?.readyState);
+// if (wSocketRef.current?.readyState === WebSocket.OPEN) {
+//   wSocketRef.current?.send(JSON.stringify(payload));
+// } else {
+//   console.error("WebSocket is not open");
+// }

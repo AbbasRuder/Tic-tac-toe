@@ -3,6 +3,7 @@ interface Props {
   winningMsg: string,
   handleGameRestart: () => void
 }
+
 export default function WinningMsg({ winningMsg, handleGameRestart }: Props) {
   return (
     <div className="h-full flex flex-col gap-2 justify-center items-center">
@@ -13,6 +14,7 @@ export default function WinningMsg({ winningMsg, handleGameRestart }: Props) {
       >
         Restart
       </button>
+      <p className="text-white">Refresh the page to begin again</p>
     </div>
   )
 }

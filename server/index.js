@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const { checkWinner, checkDraw } = require('./utils')
 const webSocketServer = require('websocket').server
 const http = require('http')
 
@@ -24,6 +25,19 @@ wsServer.on("request", request => {
     connection.on("open", () => console.log('Opened!'))
     connection.on("close", (event) => console.log('Closed! ', event))
 
+    const clientId = crypto.randomUUID()
+    //-binding the clientId with the socket connection in the clients object
+    clients[clientId] = {
+        "connection": connection
+    }
+    const payload = {
+        "method": "connect",
+        "clientId": clientId
+    }
+    // -first payload to the client
+    connection.send(JSON.stringify(payload))
+
+    
     // incoming message events
     connection.on("message", message => {
         const result = JSON.parse(message.utf8Data)
@@ -34,8 +48,9 @@ wsServer.on("request", request => {
             const gameId = crypto.randomUUID()
             games[gameId] = {
                 "gameId": gameId,
-                "gridCells": 9,
-                "clients": []
+                "clients": [],
+                "gridCells": new Array(9).fill(null),
+                "markTurn": 'X'
             }
 
             games[gameId].clients.push({
@@ -45,7 +60,7 @@ wsServer.on("request", request => {
 
             const payload = {
                 "method": "create",
-                "game": games[gameId]
+                "game": games[gameId],
             }
             console.log('game is created')
             const con = clients[clientId].connection
@@ -62,16 +77,15 @@ wsServer.on("request", request => {
                 console.log("max player reached")
                 return
             }
-            // const mark = {"0": "X", "1": "O"}[clientLength]
+
             game.clients.push({
                 "clientId": clientId,
                 "mark": "O"
             })
 
-
             const payload = {
                 "method": "join",
-                game: game
+                game: game,
             }
 
             //sending all the clients a payload
@@ -79,17 +93,55 @@ wsServer.on("request", request => {
                 clients[obj.clientId].connection.send(JSON.stringify(payload))
             });
         }
-    })
 
-    const clientId = crypto.randomUUID()
-    //-binding the clientId with the socket connection in the clients object
-    clients[clientId] = {
-        "connection": connection
-    }
-    const payload = {
-        "method": "connect",
-        "clientId": clientId
-    }
-    // -first payload to the client
-    connection.send(JSON.stringify(payload))
+        //method for playing
+        if(result.method === "play") {
+            const {gameId, clientId, index} = result
+            const gameObj = games[gameId]
+
+            const markTurn = gameObj.markTurn
+            const oppositeMark = markTurn === "X" ? "O" : "X"
+            const client = gameObj.clients.find(item => item.clientId === clientId)
+            const mark = client.mark
+            if(mark === markTurn) {
+                gameObj.gridCells[index] = mark
+                gameObj.markTurn = oppositeMark
+
+                let result 
+                if (checkWinner(gameObj.gridCells)) {
+                    result = {
+                        type: 'WINNER',
+                        message: `${markTurn} wins`
+                    }
+                } else if (checkDraw(gameObj.gridCells)) {
+                    result = {
+                        type: 'DRAW',
+                        message: 'Match Draw'
+                    }
+                }
+
+                const payload = {
+                    method: "play",
+                    cellsState: gameObj.gridCells,
+                    turnIsOkay: true,
+                    result
+                }
+    
+                //sending all the clients a payload
+                gameObj.clients.forEach(obj => {
+                  clients[obj.clientId].connection.send(JSON.stringify(payload))
+                });
+            } else if (mark !== markTurn) {
+                const payload = {
+                    method: "play",
+                    cellsState: gameObj.gridCells,
+                    turnIsOkay: false
+                }
+
+                //telling the client that it is not your turn
+                clients[clientId].connection.send(JSON.stringify(payload))
+            }
+           
+        }
+    })
 })

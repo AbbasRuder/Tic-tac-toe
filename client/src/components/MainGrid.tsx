@@ -1,86 +1,74 @@
-import { useState } from "react"
-import { GiCircleClaws } from "react-icons/gi"
-import { GiCrossMark } from "react-icons/gi"
-import WinningMsg from "./WinningMsg"
+import { useEffect, useState } from "react";
+import { GiCircleClaws } from "react-icons/gi";
+import { GiCrossMark } from "react-icons/gi";
+import WinningMsg from "./WinningMsg";
 
-type cellState = null | "X" | "O"
+type CellState = null | "X" | "O";
+type Result = {
+  type: string,
+  message: string
+}
+type Props = {
+  isTurnOkay: boolean
+  cells: CellState[];
+  setCells: React.Dispatch<React.SetStateAction<CellState[]>>;
+  sendCellStatePayload: (index: number) => void
+  turnOfCross: boolean
+  result: Result | null
+};
 
-const WINNING_COMBINATION = [
-  [0, 1, 2],
-  [3, 4, 5],
-  [6, 7, 8],
-  [0, 3, 6],
-  [1, 4, 7],
-  [2, 5, 8],
-  [0, 4, 8],
-  [2, 4, 6],
-]
-const initialCellState: cellState[] = Array(9).fill(null)
 
-export default function MainGrid() {
-  const [cells, setCells] = useState<cellState[]>(initialCellState)
-  const [turnOfCross, setTurnOfCross] = useState(false)
-  const [showMsg, setShowMsg] = useState(false)
-  const [winningMsg, setWinningMsg] = useState('')
+const initialCellState: CellState[] = Array(9).fill(null);
+export default function MainGrid({ isTurnOkay, cells, setCells, turnOfCross, sendCellStatePayload, result }: Props) {
 
+  const [showMsg, setShowMsg] = useState(false);
+  const [winningMsg, setWinningMsg] = useState("");
 
   const handleClick = (index: number) => {
     // -checks null so that fn runs only once for each cell
-    if (cells[index] === null) {
+    if (cells[index] === null && isTurnOkay) {
       const newCells = cells.map((cell, i) => {
         if (i === index) {
-          return turnOfCross ? "X" : "O"
+          return turnOfCross ? "X" : "O";
         }
-        return cell
-      })
+        return cell;
+      });
 
-      setCells(newCells)
-
-      if (checkWinner(newCells)) {
-        setShowMsg(true)
-        setWinningMsg(`${turnOfCross ? 'X' : 'O'} Wins !!`)
-      } else if (checkDraw(newCells)) {
-        setShowMsg(true)
-        setWinningMsg("Match Draw !!")
-      } else {
-        setTurnOfCross((crntTurn) => !crntTurn)
-      }
+      sendCellStatePayload(index)
+      setCells(newCells);
     }
-  }
 
-  const checkWinner = (newCells: cellState[]) => {
-    return WINNING_COMBINATION.some((combination) => {
-      const [a, b, c] = combination
-      return (
-        newCells[a] !== null &&
-        newCells[a] === newCells[b] &&
-        newCells[a] === newCells[c]
-      )
-    })
-  }
-
-  const checkDraw = (newCells: cellState[]) => {
-    return [...newCells].every((cell) => {
-      return cell === "X" || cell === "O"
-    })
-  }
+    if(!isTurnOkay) {
+      console.log("It is not your turn")
+    }
+  };
 
   const handleGameRestart = () => {
-    setCells(initialCellState)
-    setTurnOfCross(false)
-    setWinningMsg('')
-    setShowMsg(false)
-  }
+    setCells(initialCellState);
+    // setTurnOfCross(false);
+    setWinningMsg("");
+    setShowMsg(false);
+  };
 
-  const renderMark = (cell: cellState) => {
+  const renderMark = (cell: CellState) => {
     if (cell !== null) {
       return cell === "X" ? (
         <GiCrossMark className="w-16 h-16" />
       ) : (
         <GiCircleClaws className="w-16 h-16" />
-      )
+      );
     }
-  }
+  };
+
+  useEffect(() => {
+    if (result?.type === "WINNER") {
+      setShowMsg(true);
+      setWinningMsg(result.message);
+    } else if (result?.type === "DRAW") {
+      setShowMsg(true);
+      setWinningMsg(result.message);
+    }
+  }, [result])
 
   return (
     <>
@@ -97,15 +85,18 @@ export default function MainGrid() {
             >
               {renderMark(cell)}
             </div>
-          )
+          );
         })}
       </div>
 
       {showMsg && (
         <div className="h-full fixed inset-x-0 inset-y-0 bg-slate-600/50">
-          <WinningMsg winningMsg={winningMsg} handleGameRestart={handleGameRestart}/>
+          <WinningMsg
+            winningMsg={winningMsg}
+            handleGameRestart={handleGameRestart}
+          />
         </div>
       )}
     </>
-  )
+  );
 }
